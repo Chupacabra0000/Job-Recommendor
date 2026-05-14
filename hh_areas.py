@@ -13,7 +13,7 @@ CACHE_TTL_SECONDS = int(os.getenv("HH_AREAS_CACHE_TTL_SECONDS", str(7 * 24 * 60 
 
 def _headers() -> Dict[str, str]:
     # keep consistent with hh_client.py env var if present
-    default_ua = os.getenv("HH_USER_AGENT", "JobRecommendorHH/1.0 (contact: rana.shoaib7777@gmail.com.com)")
+    default_ua = os.getenv("HH_USER_AGENT", "JobRecommendorHH/1.0 (contact: rana.shoaib7777@gmail.com)")
     return {
         # ✅ FIX: HH expects standard User-Agent header
         "User-Agent": default_ua,
