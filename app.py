@@ -1,4 +1,5 @@
 import math
+import os
 import numpy as np
 import re
 import html as _html
@@ -70,10 +71,23 @@ GLOBAL_MAX_ITEMS = 5000
 GLOBAL_TOPK = 1200
 GLOBAL_MIN_HOURS_BETWEEN_REFRESH = 24
 
+def _apply_hh_oauth_from_streamlit_secrets() -> None:
+    """Load HH OAuth settings from Streamlit secrets into process env if present."""
+    key_map = {
+        "HH_CLIENT_ID": "HH_CLIENT_ID",
+        "HH_CLIENT_SECRET": "HH_CLIENT_SECRET",
+        "HH_OAUTH_TOKEN_URL": "HH_OAUTH_TOKEN_URL",
+        "HH_OAUTH_GRANT_TYPE": "HH_OAUTH_GRANT_TYPE",
+    }
+    for secret_key, env_key in key_map.items():
+        val = st.secrets.get(secret_key)
+        if val and not os.getenv(env_key):
+            os.environ[env_key] = str(val)
 
 # ---------- page ----------
 st.set_page_config(page_title="HH Job Recommender", page_icon="💼", layout="wide")
 init_db()
+_apply_hh_oauth_from_streamlit_secrets()
 
 # Initialize canonical embedding store (memmap on disk)
 # Dim for 'paraphrase-multilingual-MiniLM-L12-v2' is 384
