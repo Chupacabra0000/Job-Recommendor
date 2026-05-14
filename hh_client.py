@@ -5,8 +5,9 @@ import requests
 from typing import Any, Dict, Optional, List
 
 BASE_URL = "https://api.hh.ru"
+TOKEN_URL = os.getenv("HH_OAUTH_TOKEN_URL", "https://hh.ru/oauth/token")
 
-DEFAULT_UA = "Job-Recommendor/1.0 (contact: ranashoaib14.06.2000@gmail.com)"
+DEFAULT_UA = "Job-Recommendor/1.0 (contact: rana.shoaib7777@gmail.com)"
 HH_USER_AGENT = os.getenv("HH_USER_AGENT", DEFAULT_UA)
 
 DEFAULT_HEADERS = {
@@ -15,6 +16,57 @@ DEFAULT_HEADERS = {
     "User-Agent": HH_USER_AGENT,
 }
 
+_cached_token: Optional[str] = None
+_cached_token_expires_at: float = 0.0
+
+
+def _oauth_enabled() -> bool:
+    return bool(os.getenv("HH_CLIENT_ID") and os.getenv("HH_CLIENT_SECRET"))
+
+
+def _get_bearer_token(timeout: int = 30) -> Optional[str]:
+    global _cached_token, _cached_token_expires_at
+
+    if not _oauth_enabled():
+        return None
+
+    now = time.time()
+    if _cached_token and now < _cached_token_expires_at:
+        return _cached_token
+
+    response = requests.post(
+        TOKEN_URL,
+        data={
+            "grant_type": os.getenv("HH_OAUTH_GRANT_TYPE", "client_credentials"),
+            "client_id": os.getenv("HH_CLIENT_ID"),
+            "client_secret": os.getenv("HH_CLIENT_SECRET"),
+        },
+        headers={"User-Agent": HH_USER_AGENT},
+        timeout=timeout,
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"HH OAuth token error {response.status_code}: {response.text}")
+
+    payload = response.json()
+    access_token = payload.get("access_token")
+    if not access_token:
+        raise RuntimeError("HH OAuth token error: access_token is missing in response")
+
+    expires_in = int(payload.get("expires_in", 3600))
+    _cached_token = access_token
+    _cached_token_expires_at = now + max(30, expires_in - 60)
+    return _cached_token
+
+
+def _build_headers(timeout: int = 30) -> Dict[str, str]:
+    headers = dict(DEFAULT_HEADERS)
+    token = _get_bearer_token(timeout=timeout)
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+
 def _get(url: str, params: Optional[Dict[str, Any]] = None, timeout: int = 30) -> Dict[str, Any]:
     max_attempts = int(os.getenv("HH_MAX_RETRIES", "5"))
     base_sleep = float(os.getenv("HH_RETRY_BASE_SLEEP", "0.6"))
@@ -22,7 +74,8 @@ def _get(url: str, params: Optional[Dict[str, Any]] = None, timeout: int = 30) -
     last_err: Optional[Exception] = None
     for attempt in range(1, max_attempts + 1):
         try:
-            r = requests.get(url, params=params or {}, headers=DEFAULT_HEADERS, timeout=timeout)
+            #r = requests.get(url, params=params or {}, headers=DEFAULT_HEADERS, timeout=timeout)
+            r = requests.get(url, params=params or {}, headers=_build_headers(timeout=timeout), timeout=timeout)
         except requests.RequestException as e:
             
             last_err = e
